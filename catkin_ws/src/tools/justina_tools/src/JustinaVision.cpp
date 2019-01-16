@@ -19,20 +19,27 @@ std::vector<vision_msgs::GestureSkeleton> JustinaVision::lastGestureRecog;
 std::vector<geometry_msgs::Point> JustinaVision::lastLeftHandPos;
 std::vector<geometry_msgs::Point> JustinaVision::lastRightHandPos;
 //Members for operating face recognizer
-ros::Publisher JustinaVision::pubFacStartRecog;
-ros::Publisher JustinaVision::pubFacStartRecogOld;
-ros::Publisher JustinaVision::pubFacStopRecog;
-ros::Publisher JustinaVision::pubTrainFace;
-ros::Publisher JustinaVision::pubTrainFaceNum;
-ros::Publisher JustinaVision::pubRecFace;
-ros::Publisher JustinaVision::pubRecFaceByID;
+ros::Publisher JustinaVision::pubStartFaceDetection;
+ros::Publisher JustinaVision::pubStartFaceRecognition;
+ros::Publisher JustinaVision::pubStartFaceRecognition2D;
+ros::Publisher JustinaVision::pubSetIdFaceRecognition;
+ros::Publisher JustinaVision::pubTrainerFaces;
 ros::Publisher JustinaVision::pubClearFacesDB;
 ros::Publisher JustinaVision::pubClearFacesDBByID;
+/*ros::Publisher JustinaVision::pubTrainFace;
+ros::Publisher JustinaVision::pubRecFace;
+ros::Publisher JustinaVision::pubRecFaceByID;
+ros::Subscriber JustinaVision::subTrainer;*/
 ros::Subscriber JustinaVision::subFaces;
-ros::Subscriber JustinaVision::subTrainer;
 ros::ServiceClient JustinaVision::cltPanoFaceReco;
 std::vector<vision_msgs::VisionFaceObject> JustinaVision::lastRecognizedFaces;
 int JustinaVision::lastFaceRecogResult = 0;
+//Service for face recognition
+ros::ServiceClient JustinaVision::cltDetectPanoFaces;
+ros::ServiceClient JustinaVision::cltDetectFaces;
+ros::ServiceClient JustinaVision::cltDetectWaving;
+ros::ServiceClient JustinaVision::cltFaceRecognition;
+ros::ServiceClient JustinaVision::cltFaceRecognition2D;
 //Members for thermal camera
 ros::Publisher JustinaVision::pubStartThermalCamera;
 ros::Publisher JustinaVision::pubStopThermalCamera;
@@ -45,10 +52,14 @@ ros::ServiceClient JustinaVision::cltGetRgbdWrtRobot;
 ros::ServiceClient JustinaVision::cltDetectObjects;
 ros::ServiceClient JustinaVision::cltDetectAllObjects;
 ros::ServiceClient JustinaVision::cltDetectAllObjectsVot;
+ros::ServiceClient JustinaVision::cltDetecObjectsYOLO;
 ros::Publisher JustinaVision::pubObjStartRecog;
 ros::Publisher JustinaVision::pubObjStopRecog;
 ros::Publisher JustinaVision::pubObjStartWin;
 ros::Publisher JustinaVision::pubObjStopWin;
+ros::Publisher JustinaVision::pubEnableObjsDetectYOLO;
+ros::Subscriber JustinaVision::subGetRecoObjYOLO;
+std::vector<vision_msgs::VisionObject> JustinaVision::lastObjRecoYOLO;
 //Sevices for line finding
 ros::ServiceClient JustinaVision::cltFindLines;
 //Service for find plane
@@ -73,9 +84,6 @@ ros::ServiceClient JustinaVision::srvTrainObjectByHeight;
 ros::Publisher JustinaVision::pubMove_base_train_vision;
 //Members for detect gripper pos
 ros::ServiceClient JustinaVision::cltGripperPos;
-//Service for face recognition
-ros::ServiceClient JustinaVision::cltGetFaces;
-ros::ServiceClient JustinaVision::cltDetectWaving;
 ros::ServiceClient JustinaVision::cltCubesSeg;
 ros::ServiceClient JustinaVision::cltCutlerySeg;
 ros::ServiceClient JustinaVision::cltGetTray;
@@ -102,19 +110,23 @@ bool JustinaVision::setNodeHandle(ros::NodeHandle* nh)
     JustinaVision::subLeftHandPositions = nh->subscribe("/vision/gesture_recog_skeleton/left_hand_pos", 1, &JustinaVision::callbackLeftHandPositions);
     JustinaVision::subRightHandPositions = nh->subscribe("/vision/gesture_recog_skeleton/right_hand_pos", 1, &JustinaVision::callbackRightHandPositions);
     //Members for operating face recognizer
-    JustinaVision::pubFacStartRecog = nh->advertise<std_msgs::Empty>("/vision/face_recognizer/start_recog", 1);
-    JustinaVision::pubFacStartRecogOld = nh->advertise<std_msgs::Empty>("/vision/face_recognizer/start_recog_old", 1);
-    JustinaVision::pubFacStopRecog = nh->advertise<std_msgs::Empty>("/vision/face_recognizer/stop_recog", 1);
-    JustinaVision::pubTrainFace = nh->advertise<std_msgs::String>("/vision/face_recognizer/run_face_trainer", 1);
-    JustinaVision::pubTrainFaceNum = nh->advertise<vision_msgs::VisionFaceTrainObject>("/vision/face_recognizer/run_face_trainer_frames", 1);
+    JustinaVision::pubStartFaceDetection = nh->advertise<std_msgs::Bool>("/vision/face_recognizer/start_detect", 1);
+    JustinaVision::pubStartFaceRecognition = nh->advertise<std_msgs::Bool>("/vision/face_recognizer/start_recog", 1);
+    JustinaVision::pubStartFaceRecognition2D = nh->advertise<std_msgs::Bool>("/vision/face_recognizer/start_recog_2D", 1);
+    JustinaVision::pubSetIdFaceRecognition = nh->advertise<std_msgs::String>("/vision/face_recognizer/set_id_face_recognizer", 1);
+    JustinaVision::pubTrainerFaces = nh->advertise<vision_msgs::VisionFaceTrainObject>("/vision/face_recognizer/trainer_faces", 1);
+    JustinaVision::pubClearFacesDB = nh->advertise<std_msgs::Empty>("/vision/face_recognizer/clear_faces", 1);
+    JustinaVision::pubClearFacesDBByID = nh->advertise<std_msgs::String>("/vision/face_recognizer/clear_face_id", 1);
+    /*JustinaVision::pubTrainFace = nh->advertise<std_msgs::String>("/vision/face_recognizer/run_face_trainer", 1);
     JustinaVision::pubRecFace = nh->advertise<std_msgs::Empty>("/vision/face_recognizer/run_face_recognizer", 1);
     JustinaVision::pubRecFaceByID = nh->advertise<std_msgs::String>("/vision/face_recognizer/run_face_recognizer_id", 1);
-    JustinaVision::pubClearFacesDB = nh->advertise<std_msgs::Empty>("/vision/face_recognizer/clearfacesdb", 1);
-    JustinaVision::pubClearFacesDBByID = nh->advertise<std_msgs::String>("/vision/face_recognizer/clearfacesdbbyid", 1);
+    JustinaVision::subTrainer = nh->subscribe("/vision/face_recognizer/trainer_result", 1, &JustinaVision::callbackTrainer);*/
     JustinaVision::subFaces = nh->subscribe("/vision/face_recognizer/faces", 1, &JustinaVision::callbackFaces);
-    JustinaVision::subTrainer = nh->subscribe("/vision/face_recognizer/trainer_result", 1, &JustinaVision::callbackTrainer);
-    JustinaVision::cltPanoFaceReco = nh->serviceClient<vision_msgs::GetFacesFromImage>("/vision/face_recognizer/detect_faces");
-    JustinaVision::cltGetFaces = nh->serviceClient<vision_msgs::FaceRecognition>("/vision/face_recognizer/face_recognition");
+    JustinaVision::cltDetectPanoFaces = nh->serviceClient<vision_msgs::GetFacesFromImage>("/vision/face_recognizer/detect_pano_faces");
+    JustinaVision::cltDetectFaces = nh->serviceClient<vision_msgs::FaceRecognition>("/vision/face_recognizer/detect_faces");
+    JustinaVision::cltDetectWaving = nh->serviceClient<vision_msgs::FaceRecognition>("/vision/face_recognizer/detect_waving");
+    JustinaVision::cltFaceRecognition = nh->serviceClient<vision_msgs::FaceRecognition>("/vision/face_recognizer/face_recognition");
+    JustinaVision::cltFaceRecognition2D = nh->serviceClient<vision_msgs::FaceRecognition>("/vision/face_recognizer/face_recognition_2D");
     //Members for operation of thermal camera
     JustinaVision::pubStartThermalCamera = nh->advertise<std_msgs::Empty>("/vision/thermal_vision/start_video", 1);
     JustinaVision::pubStopThermalCamera = nh->advertise<std_msgs::Empty>("/vision/thermal_vision/stop_video", 1);
@@ -127,13 +139,16 @@ bool JustinaVision::setNodeHandle(ros::NodeHandle* nh)
     JustinaVision::cltDetectObjects         = nh->serviceClient<vision_msgs::DetectObjects>("/vision/obj_reco/det_objs");
     JustinaVision::cltDetectAllObjects      = nh->serviceClient<vision_msgs::DetectObjects>("/vision/obj_reco/det_all_objs");
     JustinaVision::cltDetectAllObjectsVot      = nh->serviceClient<vision_msgs::DetectObjects>("/vision/obj_reco/vot_objs");
+    JustinaVision::cltDetecObjectsYOLO      = nh->serviceClient<vision_msgs::DetectObjects>("/vision/obj_reco/det_objs_YOLO");
     JustinaVision::pubObjStartWin           = nh->advertise<std_msgs::Bool>("/vision/obj_reco/enableDetectWindow", 1);
     JustinaVision::pubObjStopWin            = nh->advertise<std_msgs::Bool>("/vision/obj_reco/enableDetectWindow", 0);
     JustinaVision::pubObjStartRecog         = nh->advertise<std_msgs::Bool>("/vision/obj_reco/enableRecognizeTopic", 1);
     JustinaVision::pubObjStopRecog          = nh->advertise<std_msgs::Bool>("/vision/obj_reco/enableRecognizeTopic", 0);
+    JustinaVision::pubEnableObjsDetectYOLO  = nh->advertise<std_msgs::Bool>("/vision/obj_reco/enable_det_objs_YOLO", 1);
     JustinaVision::srvTrainObject           = nh->serviceClient<vision_msgs::TrainObject>("/vision/obj_reco/trainObject");
     JustinaVision::srvTrainObjectByHeight   = nh->serviceClient<vision_msgs::TrainObject>("/vision/obj_reco/train_byHeight");
     JustinaVision::pubMove_base_train_vision = nh->advertise<std_msgs::String>("/hardware/obj_train_base", 1);
+    JustinaVision::subGetRecoObjYOLO        = nh->subscribe("/vision/obj_reco/get_det_objs_YOLO", 1, &JustinaVision::callbackGetRecoObjYOLO); 
     //Sevices for line finding
     JustinaVision::cltFindLines = nh->serviceClient<vision_msgs::FindLines>("/vision/line_finder/find_lines_ransac");
     //Service for find plane
@@ -153,7 +168,6 @@ bool JustinaVision::setNodeHandle(ros::NodeHandle* nh)
     JustinaVision::subHandNearestDetectBB = nh->subscribe("/vision/hand_detect_in_bb/hand_nearest_detect", 1, callbackHandNearestDetectBB);
     //Services for detect gripper pos
     JustinaVision::cltGripperPos = nh->serviceClient<vision_msgs::DetectGripper>("/vision/obj_reco/gripper");
-    JustinaVision::cltDetectWaving = nh->serviceClient<vision_msgs::FindWaving>("/vision/face_recognizer/detect_waving");
     //Services for segment cubes
     JustinaVision::cltCubesSeg = nh->serviceClient<vision_msgs::GetCubes>("/vision/cubes_segmentation/cubes_seg");
     //Services for segment cutlery
@@ -234,28 +248,37 @@ void JustinaVision::getLastRightHandPositions(std::vector<geometry_msgs::Point> 
 }
 
 //Methods for operating face recognizer
-void JustinaVision::startFaceRecognition()
+void JustinaVision::startFaceDetection(bool enable){
+    std::cout << "JustinaVision.->Starting face detection 2D. " << std::endl;
+    std_msgs::Bool msg;
+    msg.data = enable;
+    JustinaVision::pubStartFaceDetection.publish(msg);
+}
+
+void JustinaVision::startFaceRecognition(bool enable)
 {
     std::cout << "JustinaVision.->Starting face recognition. " << std::endl;
-    std_msgs::Empty msg;
-    JustinaVision::pubFacStartRecog.publish(msg);
+    std_msgs::Bool msg;
+    msg.data = enable;
+    JustinaVision::pubStartFaceRecognition.publish(msg);
 }
 
-void JustinaVision::startFaceRecognitionOld()
+void JustinaVision::startFaceRecognition2D(bool enable)
 {
-    std::cout << "JustinaVision.->Starting face recognition old. " << std::endl;
-    std_msgs::Empty msg;
-    JustinaVision::pubFacStartRecogOld.publish(msg);
+    std::cout << "JustinaVision.->Starting face recognition 2D. " << std::endl;
+    std_msgs::Bool msg;
+    msg.data = enable;
+    JustinaVision::pubStartFaceRecognition2D.publish(msg);
+}
+    
+void JustinaVision::setIdFaceRecognition(std::string id){
+    std::cout << "JustinaVision.->Set id face recognition. " << std::endl;
+    std_msgs::String msg;
+    msg.data = id;
+    JustinaVision::pubSetIdFaceRecognition.publish(msg);
 }
 
-void JustinaVision::stopFaceRecognition()
-{
-    std::cout << "JustinaVision.->Stopping face recognition. " << std::endl;
-    std_msgs::Empty msg;
-    JustinaVision::pubFacStopRecog.publish(msg);
-}
-
-void JustinaVision::facRecognize()
+/*void JustinaVision::facRecognize()
 {
     std::cout << "JustinaVision.->Starting face recognition without id" << std::endl;
     std_msgs::Empty msg;
@@ -276,15 +299,15 @@ void JustinaVision::facTrain(std::string id)
     std_msgs::String msg;
     msg.data = id;
     JustinaVision::pubTrainFace.publish(msg);
-}
+}*/
 
-void JustinaVision::facTrain(std::string id, int numOfFrames)
+void JustinaVision::faceTrain(std::string id, int numOfFrames)
 {
     std::cout << "JustinaVision.->Training face with id " << id << " with " << numOfFrames << " frames." <<  std::endl;
     vision_msgs::VisionFaceTrainObject msg;
     msg.id = id;
     msg.frames = numOfFrames;
-    JustinaVision::pubTrainFaceNum.publish(msg);
+    JustinaVision::pubTrainerFaces.publish(msg);
 }
 
 void JustinaVision::facClearByID(std::string id)
@@ -346,16 +369,16 @@ bool JustinaVision::getLastRecognizedFaces(std::vector<vision_msgs::VisionFaceOb
     return true;
 }
 
-int JustinaVision::getLastTrainingResult()
+/*int JustinaVision::getLastTrainingResult()
 {
     return JustinaVision::lastFaceRecogResult;
-}
+}*/
 
 vision_msgs::VisionFaceObjects JustinaVision::getRecogFromPano(sensor_msgs::Image image){
     vision_msgs::VisionFaceObjects faces;
     vision_msgs::GetFacesFromImage srv;
     srv.request.panoramic_image = image;
-    if(cltPanoFaceReco.call(srv)){
+    if(cltDetectPanoFaces.call(srv)){
         faces = srv.response.faces;
         std::cout << "Detect " << faces.recog_faces.size() << " faces" << std::endl;
     }
@@ -364,11 +387,10 @@ vision_msgs::VisionFaceObjects JustinaVision::getRecogFromPano(sensor_msgs::Imag
     return faces;
 }
 
-vision_msgs::VisionFaceObjects JustinaVision::getFaces(std::string id){
+vision_msgs::VisionFaceObjects JustinaVision::getFaces(){
     vision_msgs::VisionFaceObjects faces;
     vision_msgs::FaceRecognition srv;
-    srv.request.id = id;
-    if(cltGetFaces.call(srv)){
+    if(cltDetectFaces.call(srv)){
         faces = srv.response.faces;
         std::cout << "Detect " << faces.recog_faces.size() << " faces" << std::endl;
     }
@@ -376,6 +398,32 @@ vision_msgs::VisionFaceObjects JustinaVision::getFaces(std::string id){
         std::cout << "Failed in call service FaceRecognition" << std::endl;
     return faces;
 
+}
+
+vision_msgs::VisionFaceObjects JustinaVision::getFaceRecognition(std::string id){
+    vision_msgs::VisionFaceObjects faces;
+    vision_msgs::FaceRecognition srv;
+    srv.request.id = id;
+    if(cltFaceRecognition.call(srv)){
+        faces = srv.response.faces;
+        std::cout << "Detect " << faces.recog_faces.size() << " faces" << std::endl;
+    }
+    else
+        std::cout << "Failed in call service FaceRecognition" << std::endl;
+    return faces;
+}
+
+vision_msgs::VisionFaceObjects JustinaVision::getFaceRecognition2D(std::string id){
+    vision_msgs::VisionFaceObjects faces;
+    vision_msgs::FaceRecognition srv;
+    srv.request.id = id;
+    if(cltFaceRecognition2D.call(srv)){
+        faces = srv.response.faces;
+        std::cout << "Detect " << faces.recog_faces.size() << " faces" << std::endl;
+    }
+    else
+        std::cout << "Failed in call service FaceRecognition" << std::endl;
+    return faces;
 }
 
 std::vector<vision_msgs::VisionRect> JustinaVision::detectWaving(){
@@ -477,6 +525,42 @@ bool JustinaVision::detectAllObjectsVot(std::vector<vision_msgs::VisionObject>& 
     }
     std::cout << "JustinaVision.->Detected " << int(recoObjList.size()) << " objects" << std::endl;
     return true;
+}
+
+void JustinaVision::enableDetectObjsYOLO(bool enable){
+    std::cout << "JustinaVision.->Enable to detect objects YOLO... " << std::endl;
+    std_msgs::Bool msg;
+    msg.data = enable;
+    pubEnableObjsDetectYOLO.publish(msg);
+}
+    
+//Action client for YOLO object recog
+bool JustinaVision::detectObjectsYOLO(std::vector<vision_msgs::VisionObject>& yoloObjects){
+    std::cout << "JustinaVision.->Trying to detect objects YOLO... " << std::endl;
+    vision_msgs::DetectObjects srv;
+    if(!cltDetecObjectsYOLO.call(srv))
+    {
+        std::cout << std::endl << "Justina::Vision can't detect anything with YOLO" << std::endl << std::endl;
+        return false;
+    }
+    yoloObjects = srv.response.recog_objects;
+    /*recoObjList=srv.response.recog_objects;
+    if(recoObjList.size() < 1)
+    {
+        std::cout << std::endl << "Justina::Vision can't detect anything" << std::endl << std::endl;
+        return false;
+    }
+    std::cout << "JustinaVision.->Detected " << int(recoObjList.size()) << " objects" << std::endl;*/
+    return true;
+}
+
+void JustinaVision::callbackGetRecoObjYOLO(const vision_msgs::VisionObjectList::ConstPtr& msg){
+    JustinaVision::lastObjRecoYOLO = msg->ObjectList;
+}
+
+void JustinaVision::getObjectsYOLO(std::vector<vision_msgs::VisionObject>& yoloObjects){
+    yoloObjects = JustinaVision::lastObjRecoYOLO;
+    JustinaVision::lastObjRecoYOLO.clear();
 }
 
 //Methods for move the train object and move the tranining base

@@ -18,6 +18,7 @@
 #include "point_cloud_manager/GetRgbd.h"
 #include "sensor_msgs/Image.h"
 #include "vision_msgs/VisionObject.h"
+#include "vision_msgs/VisionObjectList.h"
 #include "vision_msgs/DetectObjects.h"
 #include "vision_msgs/VisionFaceTrainObject.h"
 #include "vision_msgs/VisionFaceObjects.h"
@@ -58,20 +59,28 @@ private:
     static std::vector<geometry_msgs::Point> lastLeftHandPos;
     static std::vector<geometry_msgs::Point> lastRightHandPos;
     //Members for operating face recognizer
-    static ros::Publisher pubFacStartRecog;
-    static ros::Publisher pubFacStartRecogOld;
-    static ros::Publisher pubFacStopRecog;
-    static ros::Publisher pubTrainFace;
-    static ros::Publisher pubTrainFaceNum;
-    static ros::Publisher pubRecFace;
-    static ros::Publisher pubRecFaceByID;
+    static ros::Publisher pubStartFaceDetection;
+    static ros::Publisher pubStartFaceRecognition;
+    static ros::Publisher pubStartFaceRecognition2D;
+    static ros::Publisher pubSetIdFaceRecognition;
+    static ros::Publisher pubTrainerFaces;
     static ros::Publisher pubClearFacesDB;
     static ros::Publisher pubClearFacesDBByID;
+    /* 
+    static ros::Publisher pubTrainFace;
+    static ros::Publisher pubRecFace;
+    static ros::Publisher pubRecFaceByID;
+    static ros::Subscriber subTrainer;*/
     static ros::Subscriber subFaces;
-    static ros::Subscriber subTrainer;
     static ros::ServiceClient cltPanoFaceReco;
     static std::vector<vision_msgs::VisionFaceObject> lastRecognizedFaces;
     static int lastFaceRecogResult;
+    //Service for face recognition
+    static ros::ServiceClient cltDetectPanoFaces;
+    static ros::ServiceClient cltDetectFaces;
+    static ros::ServiceClient cltDetectWaving;
+    static ros::ServiceClient cltFaceRecognition;
+    static ros::ServiceClient cltFaceRecognition2D;
     //Members for thermal camera
     static ros::Publisher pubStartThermalCamera;
     static ros::Publisher pubStopThermalCamera;
@@ -86,9 +95,13 @@ private:
     static ros::Publisher pubObjStopRecog;
     static ros::Publisher pubObjStartWin;
     static ros::Publisher pubObjStopWin;
+    static ros::Publisher pubEnableObjsDetectYOLO;
     static ros::ServiceClient srvTrainObject;
     static ros::ServiceClient srvTrainObjectByHeight;
     static ros::Publisher pubMove_base_train_vision;
+    static ros::ServiceClient cltDetecObjectsYOLO;
+    static ros::Subscriber subGetRecoObjYOLO;
+    static std::vector<vision_msgs::VisionObject> lastObjRecoYOLO;
     //Sevices for line finding
     static ros::ServiceClient cltFindLines;
     //Service for find plane
@@ -112,9 +125,6 @@ private:
     static bool isHandNearestDetectedBB;
     //Members for detect gripper
     static ros::ServiceClient cltGripperPos;
-    //Service for face recognition
-    static ros::ServiceClient cltGetFaces;
-    static ros::ServiceClient cltDetectWaving;
     //Members to segment objects by color
     static ros::ServiceClient cltCubesSeg;
     static ros::ServiceClient cltCutlerySeg;
@@ -137,20 +147,23 @@ public:
     static void getLastLeftHandPositions(std::vector<geometry_msgs::Point> &leftHandPositions);
     static void getLastRightHandPositions(std::vector<geometry_msgs::Point> &rightHandPositions);
     //Methods for operating face recognizer
-    static void startFaceRecognition();
-    static void startFaceRecognitionOld();
-    static void stopFaceRecognition();
-    static void facRecognize();
-    static void facRecognize(std::string id);
-    static void facTrain(std::string id);
-    static void facTrain(std::string id, int numOfFrames);
+    static void startFaceDetection(bool enable);
+    static void startFaceRecognition(bool enable);
+    static void startFaceRecognition2D(bool enable);
+    static void setIdFaceRecognition(std::string id);
+    static void faceTrain(std::string id, int numOfFrames);
     static void facClearByID(std::string id);
     static void facClearAll();
+    /*static void facRecognize();
+    static void facRecognize(std::string id);
+    static void facTrain(std::string id);*/
     static bool getMostConfidentFace(std::string& id, float& posX, float& posY, float& posZ, float& confidence, int& gender, bool& isSmiling);
     static bool getLastRecognizedFaces(std::vector<vision_msgs::VisionFaceObject>& faces);
-    static int getLastTrainingResult();
+    // static int getLastTrainingResult();
     static vision_msgs::VisionFaceObjects getRecogFromPano(sensor_msgs::Image image);
-    static vision_msgs::VisionFaceObjects getFaces(std::string id);
+    static vision_msgs::VisionFaceObjects getFaces();
+    static vision_msgs::VisionFaceObjects getFaceRecognition(std::string id = "");
+    static vision_msgs::VisionFaceObjects getFaceRecognition2D(std::string id = "");
     static std::vector<vision_msgs::VisionRect> detectWaving();
     //Methods for object detector and recognizer
     static void startObjectFinding();
@@ -160,6 +173,10 @@ public:
     static bool detectObjects(std::vector<vision_msgs::VisionObject>& recoObjList, bool saveFiles = false);
     static bool detectAllObjects(std::vector<vision_msgs::VisionObject>& recoObjList, bool saveFiles = false);
     static bool detectAllObjectsVot(std::vector<vision_msgs::VisionObject>& recoObjList, sensor_msgs::Image &image, int iterations = 1);
+    //Action client for YOLO object recog
+    static void enableDetectObjsYOLO(bool enable);
+    static bool detectObjectsYOLO(std::vector<vision_msgs::VisionObject>& yoloObjects);
+    static void getObjectsYOLO(std::vector<vision_msgs::VisionObject>& yoloObjects);
     static void moveBaseTrainVision(const std_msgs::String& msg);
     //Methods for line finding
     static bool findLine(float& x1, float& y1, float& z1, float& x2, float& y2, float& z2);
@@ -192,6 +209,8 @@ public:
     static bool getDishwasher(vision_msgs::MSG_VisionDishwasher &dishwasher);
 
 private:
+    //callbacks for obj recog
+    static void callbackGetRecoObjYOLO(const vision_msgs::VisionObjectList::ConstPtr& msg);
     //callbacks for pano maker
     static void callbackPanoRecived(const sensor_msgs::Image msg);
     //callbacks for skeleton recognition

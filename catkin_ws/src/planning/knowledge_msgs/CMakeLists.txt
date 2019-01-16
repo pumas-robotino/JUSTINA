@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
         geometry_msgs
 	sensor_msgs
 	vision_msgs
+	nav_msgs
         message_generation
 )
 
@@ -30,6 +31,8 @@ add_service_files(
   StrQueryKDB.srv
   InitKDB.srv
   IsPointInKnownArea.srv
+  GetVisitLocationsPath.srv
+  GetRoomOfPoint.srv
 )
 
 add_message_files(
@@ -41,6 +44,7 @@ add_message_files(
   PlanningCmdClips.msg
   RecognizedSpeech.msg
   RepeatedSentence.msg
+  SphinxSetFile.msg
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -50,6 +54,7 @@ generate_messages(
         geometry_msgs
 	vision_msgs
 	sensor_msgs
+	nav_msgs
         knowledge_msgs
 )
 
